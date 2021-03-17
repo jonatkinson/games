@@ -2,12 +2,15 @@ import sys
 import pygame
 import random
 
+from pygame import color
+
 from levels import level_data
 
-colours = {
-    'black': (0, 0, 0),
-    'orange': (255, 95, 0),
-    'white': (255, 255, 255)
+colors = {
+    'WHITE': (255, 255, 255),
+    'BLACK': (0,0,0),
+    'ORANGE': (255, 95, 0),
+    'PURPLE': (128, 0, 128)
 }
 
 class Snake():
@@ -15,7 +18,7 @@ class Snake():
     body = []
     growing = False
     direction = False
-
+    color = colors['ORANGE']
 
     def proceed(self):
         if self.direction == "up":
@@ -77,6 +80,9 @@ class Snake():
         # If we have got the food...
         if head == game.food:
 
+            # Play sound
+            pygame.mixer.Sound.play(pygame.mixer.Sound('collect.wav'))
+
             # Increment the score, place some new food.
             game.score += 1
             game.food = game.empty_location()
@@ -89,6 +95,7 @@ class Snake():
             for x, tile in enumerate(data):
                 if tile == "#":
                     if [x, y] == head:
+                        pygame.mixer.Sound.play(pygame.mixer.Sound('collide.wav'))
                         game.lives -= 1
                         self.body = [game.empty_location()]
                         self.direction = False
@@ -105,17 +112,6 @@ class SnakeGame():
     The main game class.
     """
 
-    WIDTH = 640
-    HEIGHT = 480
-
-    GAME_OFFSET_X = 200
-    GAME_OFFSET_Y = 40
-
-    WHITE = (255, 255, 255)
-    BLACK = (0,0,0)
-    ORANGE = (255, 95, 0)
-    PURPLE = (128, 0, 128)
-
     def __init__(self):
         """
         Sets up the environment, and then starts the game.
@@ -124,65 +120,56 @@ class SnakeGame():
         pygame.init()
 
         # Infrastructure stuff.
-        self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
+        self.screen = pygame.display.set_mode((640, 480))
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.Font('slkscr.ttf', 24)
+        self.font = pygame.font.Font('slkscr.ttf', 24) 
+        self.mixer = pygame.mixer.init()
 
         # Game stuff.
         while True:
-            self.title()
+            self.message("SNAKE", "Press a key to begin")
             self.game()
-            self.gameover()
+            self.message("GAME OVER")
 
-    def title(self):
+
+    def setup_level(self, level_number):
         """
-        This displays the title screen.
+        This handles setting up the state for a new level.
         """
 
-        # Display the title.
-        title = self.font.render("SNAKE", False, self.ORANGE)
-        title_rect = title.get_rect(center=(self.WIDTH / 2, self.HEIGHT / 2 - 72))
-        self.screen.blit(title, title_rect)
+        # Load the level.
+        self.level = level_data[self.level_number]
 
-        # Display the help.
-        help = self.font.render("Press any key to start", False, self.WHITE)
-        help_rect = help.get_rect(center=(self.WIDTH / 2, self.HEIGHT / 2))
-        self.screen.blit(help, help_rect)
+        # Setup the snake in an empty location.
+        self.snake = Snake()
+        self.snake.body = [self.empty_location()]
 
-        # Display the title screen.
-        pygame.display.flip()
+        # Set the score.
+        self.score = 0
 
-        wait = True
-        while wait:
-            for event in pygame.event.get():
+        # Show the level message.
+        self.message(f"Level {self.level_number + 1}", "Score 10 points")
 
-                # Handle window close.
-                if event.type == pygame.QUIT: 
-                    sys.exit()
+        # Setup some food.
+        self.food = self.empty_location()
 
-                # Handle any other key (to start the game).
-                if event.type == pygame.KEYDOWN:
-                    wait = False
+        # Flash the before we hand control to the player.
+        for color in [colors['ORANGE'], colors['BLACK'], colors['ORANGE'], colors['BLACK']]:
+            self.render(snake_color=color)
+            pygame.time.wait(300)
+            
 
     def game(self):
         """
         This plays the main game.
         """
 
-        # Setup the game state.
+        # Setup some global game state.
         self.lives = 5
-        self.score = 0
 
         # Setup the level.
         self.level_number = 0
-        self.level = level_data[self.level_number]
-
-        # Setup the snake.
-        self.snake = Snake()
-        self.snake.body = [self.empty_location()]
-
-        # Setup some food.
-        self.food = self.empty_location()
+        self.setup_level(self.level_number)
 
         while True:
 
@@ -196,19 +183,19 @@ class SnakeGame():
 
             # Handle input
             key_pressed = False
-            if pygame.key.get_pressed()[pygame.K_UP]:
+            if pygame.key.get_pressed()[pygame.K_UP] and not key_pressed:
                 key_pressed = True
                 self.snake.up()
 
-            if pygame.key.get_pressed()[pygame.K_DOWN]:
+            if pygame.key.get_pressed()[pygame.K_DOWN] and not key_pressed:
                 key_pressed = True
                 self.snake.down()
 
-            if pygame.key.get_pressed()[pygame.K_LEFT]:
+            if pygame.key.get_pressed()[pygame.K_LEFT] and not key_pressed:
                 key_pressed = True
                 self.snake.left()
 
-            if pygame.key.get_pressed()[pygame.K_RIGHT]:
+            if pygame.key.get_pressed()[pygame.K_RIGHT] and not key_pressed:
                 key_pressed = True
                 self.snake.right()
 
@@ -219,25 +206,59 @@ class SnakeGame():
             # Collide the snake (pass the SnakeGame instance).
             self.snake.collide(self)
 
+            # A collision may have resulted in a game over.
+            if self.lives == 0:
+                return
+
             # Check some game state.
             if self.score == 10:
 
                 self.level_number += 1
-                self.level = level_data[self.level_number]
-
-                self.snake = Snake()
-                self.snake.body = [self.empty_location()]
-
-                self.food = self.empty_location()
-                self.score = 0
+                self.setup_level(self.level_number)
 
             # Render the screen.
-            self.draw()
+            self.render()
             self.clock.tick(10)
-    
-    def gameover(self):
-        pass
 
+
+    def message(self, primary_message, secondary_message=False):
+        """
+        This displays the title screen.
+        """
+
+        # Blank the screen.
+        self.screen.fill(colors['BLACK'])
+
+        # Display the primary message
+        primary = self.font.render(primary_message, False, colors['ORANGE'])
+        primary_rect = primary.get_rect(center=(320, 170))
+        self.screen.blit(primary, primary_rect)
+
+        # Display the message.
+        pygame.display.flip()
+        pygame.time.wait(1000)
+
+        # Display the secondary message.
+        if secondary_message:
+            secondary = self.font.render(secondary_message, False, colors['WHITE'])
+            secondary_rect = secondary.get_rect(center=(320, 240))
+            self.screen.blit(secondary, secondary_rect)
+
+        # Display the message.
+        pygame.display.flip()
+        pygame.time.wait(1000)
+
+        wait = True
+        while wait:
+            for event in pygame.event.get():
+
+                # Handle window close.
+                if event.type == pygame.QUIT: 
+                    sys.exit()
+
+                # Handle any other key (to start the game).
+                if event.type == pygame.KEYDOWN:
+                    wait = False
 
     def empty_location(self):
         """
@@ -263,6 +284,7 @@ class SnakeGame():
 
         return [possible_x, possible_y]
 
+
     def draw_box(self, x, y, color):
         """
         This renders a box; our graphics primitive.
@@ -272,30 +294,30 @@ class SnakeGame():
             self.screen, 
             pygame.Color(color), 
             pygame.Rect(
-                x * 20 + self.GAME_OFFSET_X, 
-                y * 20 + self.GAME_OFFSET_Y, 
+                x * 20 + 200, # offset the playfield by 200px. 
+                y * 20 + 40, # offset the playfield by 40px.
                 20, 
                 20
             )
         )
 
 
-    def draw(self):
+    def render(self, snake_color=colors['ORANGE']):
         """
         This renders the current game state.
         """
 
         # Blank the screen.
-        self.screen.fill(self.BLACK)
+        self.screen.fill(colors['BLACK'])
 
         # Draw the status panel
-        status = self.font.render(f"LEVEL {self.level_number}", False, self.ORANGE)
+        status = self.font.render(f"LEVEL {self.level_number + 1}", False, colors['ORANGE'])
         self.screen.blit(status, (40, 40))
 
-        lives = self.font.render(f"LIVES {self.lives}", False, self.WHITE)
+        lives = self.font.render(f"LIVES {self.lives}", False, colors['WHITE'])
         self.screen.blit(lives, (40, 70))
 
-        score = self.font.render(f"SCORE {self.score}", False, self.WHITE)
+        score = self.font.render(f"SCORE {self.score}", False, colors['WHITE'])
         self.screen.blit(score, (40, 100))
 
         # Iterate through the level data, draw the map and snake.
@@ -304,15 +326,16 @@ class SnakeGame():
 
                 # Draw walls.
                 if tile == "#":
-                    self.draw_box(x, y, self.WHITE)
+                    self.draw_box(x, y, colors['WHITE'])
 
                 # Draw food.
-                if [x, y] == self.food:
-                    self.draw_box(x, y, self.PURPLE)
+                if self.food:
+                    if [x, y] == self.food:
+                        self.draw_box(x, y, colors['PURPLE'])
 
                 # Draw snake.
                 if [x, y] in self.snake.body:
-                    self.draw_box(x, y, self.ORANGE)
+                    self.draw_box(x, y, snake_color)
 
         pygame.display.flip()
 
