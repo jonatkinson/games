@@ -20,7 +20,7 @@ class Snake():
     direction = False
     color = colors['ORANGE']
 
-    def proceed(self):
+    def move(self):
         if self.direction == "up":
             self.up()
         if self.direction == "down":
@@ -90,6 +90,8 @@ class Snake():
             # Our snake will grow next turn.
             self.growing = True
 
+            return False
+
         # If we have hit a wall...
         for y, data in enumerate(game.level):
             for x, tile in enumerate(data):
@@ -99,12 +101,15 @@ class Snake():
                         game.lives -= 1
                         self.body = [game.empty_location()]
                         self.direction = False
+                        return True
 
         # If the snake hits itself.
         if head in self.body[1:]:
+            pygame.mixer.Sound.play(pygame.mixer.Sound('collide.wav'))
             game.lives -= 1
             self.body = [game.empty_location()]
             self.direction = False
+            return True
 
 
 class SnakeGame():
@@ -127,9 +132,9 @@ class SnakeGame():
 
         # Game stuff.
         while True:
-            self.message("SNAKE", "Press a key to begin")
+            self.message("SNAKE.", "Press a key to begin.")
             self.game()
-            self.message("GAME OVER")
+            self.message("GAME OVER.")
 
 
     def setup_level(self, level_number):
@@ -148,7 +153,7 @@ class SnakeGame():
         self.score = 0
 
         # Show the level message.
-        self.message(f"Level {self.level_number + 1}", "Score 10 points")
+        self.message(f"Level {self.level_number + 1}.", f"Score 10 points. {self.lives} lives left.")
 
         # Setup some food.
         self.food = self.empty_location()
@@ -181,30 +186,30 @@ class SnakeGame():
             if pygame.key.get_pressed()[pygame.K_ESCAPE]:
                 sys.exit()
 
-            # Handle input
-            key_pressed = False
-            if pygame.key.get_pressed()[pygame.K_UP] and not key_pressed:
-                key_pressed = True
-                self.snake.up()
+            # Handle input, and set the snake direction.
+            # The snake can never reverse direction.
+            if pygame.key.get_pressed()[pygame.K_UP]:
+                if not self.snake.direction == "down":
+                    self.snake.direction = "up"
 
-            if pygame.key.get_pressed()[pygame.K_DOWN] and not key_pressed:
-                key_pressed = True
-                self.snake.down()
+            if pygame.key.get_pressed()[pygame.K_DOWN]:
+                if not self.snake.direction == "up":
+                    self.snake.direction = "down"
 
-            if pygame.key.get_pressed()[pygame.K_LEFT] and not key_pressed:
-                key_pressed = True
-                self.snake.left()
+            if pygame.key.get_pressed()[pygame.K_LEFT]:
+                if not self.snake.direction == "right":
+                    self.snake.direction = "left"
 
-            if pygame.key.get_pressed()[pygame.K_RIGHT] and not key_pressed:
-                key_pressed = True
-                self.snake.right()
+            if pygame.key.get_pressed()[pygame.K_RIGHT]:
+                if not self.snake.direction == "left":
+                    self.snake.direction = "right"
 
-            # If there was no input, proceed in the current direction.
-            if not key_pressed:
-                self.snake.proceed()
+            # Implement the movement.
+            self.snake.move()
 
             # Collide the snake (pass the SnakeGame instance).
-            self.snake.collide(self)
+            if self.snake.collide(self):
+                self.setup_level(self.level_number)
 
             # A collision may have resulted in a game over.
             if self.lives == 0:
@@ -228,14 +233,16 @@ class SnakeGame():
 
         # Blank the screen.
         self.screen.fill(colors['BLACK'])
+        pygame.time.wait(500)
 
         # Display the primary message
         primary = self.font.render(primary_message, False, colors['ORANGE'])
         primary_rect = primary.get_rect(center=(320, 170))
         self.screen.blit(primary, primary_rect)
 
-        # Display the message.
+        # Render
         pygame.display.flip()
+        pygame.mixer.Sound.play(pygame.mixer.Sound('collide.wav'))
         pygame.time.wait(1000)
 
         # Display the secondary message.
@@ -244,8 +251,9 @@ class SnakeGame():
             secondary_rect = secondary.get_rect(center=(320, 240))
             self.screen.blit(secondary, secondary_rect)
 
-        # Display the message.
+        # Render
         pygame.display.flip()
+        pygame.mixer.Sound.play(pygame.mixer.Sound('collide.wav'))
         pygame.time.wait(1000)
 
         wait = True
