@@ -23,3 +23,4 @@ This is a reimplementation of Snake. I spent more time on this, and it shows in 
 ## Thanks
 
 - Jason Kottke for the Silkscreen font, which I used throughout.
+- Contralogic for the [NES sounds samples](http://www.contralogic.com/256-nes-samples/)
