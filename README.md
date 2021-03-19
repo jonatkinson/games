@@ -12,7 +12,7 @@ This is almost a non-game. Bounce the ball off the paddle until the game moves t
 - `pygame.font` usage.
 - `pygame.time.clock` for 60fps.
 
-[Writeup here](https://www.jonatkinson.co.uk/posts/game-a-week-1/).
+[Writeup here](https://www.jonatkinson.co.uk/posts/a-game-a-week-1/).
 
 ## snake/snake.py
 
@@ -23,7 +23,7 @@ This is a reimplementation of Snake. I spent more time on this, and it shows in 
 - 5 increasingly difficult levels.
 - Sound!
 
-[Writeup here](https://www.jonatkinson.co.uk/posts/game-a-week-2/).
+[Writeup here](https://www.jonatkinson.co.uk/posts/a-game-a-week-2/).
 
 ## Thanks
 
