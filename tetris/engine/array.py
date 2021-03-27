@@ -89,11 +89,37 @@ class TwoDArray(object):
         """
         self.data[(y * self.sx) + x] = v
 
+    def slice(self, x1, y1, x2, y2):
+        """
+        Returns a new TwoDArray slice from the given coordinates.
+        """
 
-a = TwoDArray(10, 10, 1)
-b = TwoDArray(8, 8, -1)
+        slice = TwoDArray(x2 - x1, y2 - y1)
+        for ix, x in enumerate(range(x1, x2)):
+            for iy, y in enumerate(range(y1, y2)):
+                slice.set(ix, iy, self.get(x, y))
+        return slice
 
-a.combine(b, 1, 1)
+    def insert(self, n, x, y):
+        """
+        Inserts a TwoDArray at given coordinates.
+        """
 
-print(a)
+        if type(n) != type(self):
+            raise TypeError("Can't insert non-TwoDArray")
 
+        nx, ny = 0, 0
+        for i, data in enumerate(n.data):
+            if i % n.sx == 0 and i > 0: ny += 1; nx = 0
+
+            lx = nx + x
+            ly = ny + y
+
+            if lx >= self.sx or ly >= self.sy:
+                raise IndexError("Can't combine outside bounds of array.")
+
+            if type(data) != type(self.get(lx, ly)):
+                raise TypeError("Can't combine different data types in array.")
+
+            self.set(lx, ly, data)
+            nx+=1

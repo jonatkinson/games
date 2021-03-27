@@ -2,8 +2,6 @@ import sys
 import copy
 import pygame
 
-from loguru import logger
-
 from globals import screen, clock, mixer, font
 from engine import colors, draw, util, array
 
@@ -40,19 +38,24 @@ class TetrisGame():
         self.current_x = 4
         self.current_y = 1
 
-        # Whether the player manually moved the piece down in the current tick.
-        # This is important so the game doesn't 'double drop' the player.
-        self.current_down = False
-
         # Some game status.
-        self.score = 0
+        self.linescore = 0
         self.level = 0
         self.ticks = 0
+        self.collided_previous_tick = 0
 
-        while True:
-            logger.info(f"Beginning tick {self.ticks}.")
+        # Title screen.
+        draw.message("TETRIS", "Press key")
+        draw.message("Arrows: Move    Z/X: Rotate", "Press key")
+
+        # The main game loop.
+        while self.level >= 0:
             self.input()
             self.advance()
+        
+        # Game over and quit.
+        draw.message("Game Over", "Press key")
+        sys.exit()
 
     def input(self):
         """
@@ -77,12 +80,11 @@ class TetrisGame():
                 if event.type == pygame.QUIT: 
                     sys.exit()
 
-            if pygame.key.get_pressed()[pygame.K_UP]: # Slam
-                pass
+            if pygame.key.get_pressed()[pygame.K_ESCAPE]:
+                sys.exit()
 
             if pygame.key.get_pressed()[pygame.K_DOWN]:
                 action = True
-                self.current_down = True
                 if self.current_y <= 18:
                     self.current_y += 1
 
@@ -102,40 +104,22 @@ class TetrisGame():
                 action = "counterclockwise"
                 self.current.counterclockwise()
 
-            if pygame.key.get_pressed()[pygame.K_l]:
-                action = True
-                self.level += 1
-                if self.level > 9:
-                    self.level = 9
-
-            if pygame.key.get_pressed()[pygame.K_r]:
-                action = True
-                self.current_y = 1
-                self.current = piece.random_piece()
-                self.next = piece.random_piece()
-
-
             # Remove any stale piece data.
-            for i, d in enumerate(self.playfield.data):
-                if d == 3: self.playfield.data[i] = 0
+            self.playfield.replace(3, 0)
 
             # Insert the game piece.
             try:
                 self.playfield.combine(self.current.frame(), self.current_x, self.current_y)
             except IndexError:
-                logger.info("Out of bounds detected. Trying to fix.")
                 self.playfield = copy.deepcopy(previous_playfield)
                 self.current_x -= 1
                 self.current_y -= 1
 
             # If an action was taken...
             if action:
-                logger.info("Action detected, updating now.")
-
                 # Check for collisions. If there is a collision, then we reset
                 # to our previous state (hence, undoing the movement).
                 if self.collide():
-                    logger.info("Collision detected. Resetting state.")
 
                     # Reset the playfield back to it's previous state.
                     self.playfield = copy.deepcopy(previous_playfield)
@@ -149,13 +133,16 @@ class TetrisGame():
                     # Re-render.
                     self.render()
 
+                # Slight delay before the next action.
+                # For some reason, a longer delay after a spin feels better.
+                if action in ["clockwise", "counterclockwise"]:
+                    pygame.time.wait(150)
+                else:
+                    pygame.time.wait(75)
+
                 # Reset the action.
                 action = False
 
-                # Slight delay before the next action.
-                pygame.time.wait(75)
-
-        logger.info("Done waiting for input.")
 
 
     def collide(self):
@@ -184,34 +171,33 @@ class TetrisGame():
         previous_playfield = copy.deepcopy(self.playfield)
 
         # Drop active play piece.
-        if not self.current_down:
-            self.current_y += 1
+        self.current_y += 1
 
-            # Remove any stale piece data.
-            for i, d in enumerate(self.playfield.data):
-                if d == 3: self.playfield.data[i] = 0
+        # Remove any stale piece data.
+        for i, d in enumerate(self.playfield.data):
+            if d == 3: self.playfield.data[i] = 0
 
-            # Insert the game piece.
-            try:
-                self.playfield.combine(self.current.frame(), self.current_x, self.current_y)
-            except IndexError:
-                logger.info("Out of bounds detected on advance. Trying to fix.")
-                self.playfield = copy.deepcopy(previous_playfield)
-                self.current_y -= 1
-
-        self.current_down = False
+        # Insert the game piece.
+        try:
+            self.playfield.combine(self.current.frame(), self.current_x, self.current_y)
+        except IndexError:
+            self.playfield = copy.deepcopy(previous_playfield)
+            self.current_y -= 1
 
         # Check for collisions.
         if self.collide():
-            logger.info("Collision while advancing game. Settling pieces.")
 
             # Reset the playfield.
             self.playfield = copy.deepcopy(previous_playfield)
 
             # Convert active blocks to settled blocks.
-            logger.info("Converting blocks to settled.")
             if self.playfield.replace(3, 2):
                 pygame.mixer.Sound.play(pygame.mixer.Sound('sounds/collide.wav'))
+
+            # Prepare for gameover condition.
+            if self.collided_previous_tick > 3:
+                self.level = -1
+            self.collided_previous_tick += 1
 
             # Check for lines.
             self.lines()
@@ -219,9 +205,10 @@ class TetrisGame():
             # Reset a new piece.
             self.current_y = 1
             self.current_x = 4
-            self.current = piece.random_piece()
+            self.current = copy.deepcopy(self.next)
             self.next = piece.random_piece()
-
+        else:
+            self.collided_previous_tick = 0
 
         self.render()
 
@@ -231,37 +218,53 @@ class TetrisGame():
         This scans for completed lines.
         """
 
+        complete_lines = []
         for y in range(1, 21):
             complete_line = True
             for x in range(1, 11):
                 if self.playfield.get(x, y) == 0:
                     complete_line = False
             if complete_line:
-                print(f"Complete line at {y}")
+                complete_lines.append(y)
 
-                # Play sound
+        if complete_lines:
+
+            # Play sound
+            for s in range(len(complete_lines)):
                 pygame.mixer.Sound.play(pygame.mixer.Sound('sounds/collect.wav'))
 
-                # Flash lines
-                flashes = 0
-                while flashes < 4:
+            # Flash lines
+            flashes = 0
+            while flashes < 4:
+                for y in complete_lines:
                     for x in range(1, 11):
                         self.playfield.set(x, y, 1)
-                    self.render()
-                    pygame.time.wait(75)
+                self.render()
+                pygame.time.wait(75)
+                for y in complete_lines:
                     for x in range(1, 11):
                         self.playfield.set(x, y, 3)
-                    self.render()
-                    pygame.time.wait(75)                    
-                    flashes += 1
+                self.render()
+                pygame.time.wait(75)                    
+                flashes += 1
 
-                # Remove lines
+            # Remove lines
+            for y in complete_lines:
+                above = self.playfield.slice(1, 1, 11, y)
+                
+                # Drop everything down.
+                self.playfield.insert(above, 1, 2)
 
-                # Drop playfield
+                # Fill the first row with empty data.
+                for x in range(1, 11):
+                    self.playfield.set(x, 1, 0)
 
-                # pygame.mixer.Sound.play(pygame.mixer.Sound('sounds/collect.wav'))
-
-
+            # Add to score.
+            for l in range(len(complete_lines)):
+                self.linescore += 1
+                # Increase the level.
+                if self.linescore % 10 == 0:
+                    self.level += 1
 
     def render(self):
         """
@@ -272,13 +275,19 @@ class TetrisGame():
         screen.fill(colors.BLACK)
 
         # Draw the status.
-        draw.text(screen, font, f"Level: {self.level + 1}", 20, 20, colors.ORANGE)
-        draw.text(screen, font, f"Score: {self.score}", 20, 50, colors.ORANGE)
-        draw.text(screen, font, f"Next:", 20, 80, colors.ORANGE)
-        # self.next.render(1, 5, true_coords=True)
+        draw.text(screen, f"Level: {self.level + 1}", 20, 20, colors.ORANGE)
+        draw.text(screen, f"Lines: {self.linescore}", 20, 50, colors.ORANGE)
+        draw.text(screen, f"Next:", 20, 80, colors.ORANGE)
 
-        # Debug status bar.
-        draw.text(screen, font, f"cx: {self.current_x} cy: {self.current_y}", 20, 440, colors.PURPLE)
+        # Draw the next piece.
+        for x in range(self.next.frame().sx):
+            for y in range(self.next.frame().sy):
+                try:
+                    d = self.next.frame().get(x, y)
+                    if d == 3:
+                        draw.tile(screen, x + 1, y + 6, colors.ORANGE) 
+                except IndexError:
+                    continue
 
         # Draw the playfield.
         for x in range(self.playfield.sx):
