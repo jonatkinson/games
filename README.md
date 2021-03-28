@@ -25,6 +25,12 @@ This is a reimplementation of Snake. I spent more time on this, and it shows in 
 
 [Writeup here](https://www.jonatkinson.co.uk/posts/a-game-a-week-2/).
 
+## tetris/tetris.py
+
+![tetris.py screen capture](https://www.jonatkinson.co.uk/media/game-a-week-3d.gif)
+
+A Tetris clone, probably the minimum viable implementation of Tetris features, while still recognisably being the same game.
+
 ## Thanks
 
 - Jason Kottke for the Silkscreen font, which I used throughout.
